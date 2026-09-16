@@ -1,0 +1,15 @@
+# Local Postgres for development.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: employee
+      POSTGRES_PASSWORD: employee
+      POSTGRES_DB: employee_hierarchy
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

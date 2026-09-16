@@ -18,6 +18,12 @@ dependencies = [
     "sqlalchemy>=2.0.53",
 ]
 
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
