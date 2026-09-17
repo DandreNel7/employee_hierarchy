@@ -2,18 +2,22 @@ const salaryFormat = new Intl.NumberFormat("en-ZA", {
   style: "currency",
   currency: "ZAR",
   maximumFractionDigits: 0,
-})
+});
 
-const dateFormat = new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" })
+const dateFormat = new Intl.DateTimeFormat("en-ZA", { dateStyle: "medium" });
 
 export function formatSalary(salary: string) {
-  return salaryFormat.format(Number(salary))
+  return salaryFormat.format(Number(salary));
 }
 
 export function formatDate(date: string) {
-  return dateFormat.format(new Date(date))
+  return dateFormat.format(new Date(date));
+}
+
+export function groupDigits(value: string) {
+  return value.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 export function initials(firstName: string, lastName: string) {
-  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase()
+  return `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 }
