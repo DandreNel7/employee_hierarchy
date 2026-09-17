@@ -3,7 +3,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.rate_limit import limiter
-from app.routers import auth, employees
+from app.routers import auth, departments, employees, stats
 
 app = FastAPI(
     title="Employee Hierarchy API",
@@ -16,6 +16,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.include_router(auth.router)
 app.include_router(employees.router)
+app.include_router(departments.router)
+app.include_router(stats.router)
 
 
 @app.get("/api/health")
