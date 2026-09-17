@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.services.avatars import gravatar_url
 
 if TYPE_CHECKING:
     from app.models.department import Department
@@ -57,3 +58,7 @@ class Employee(Base):
     @property
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}"
+
+    @property
+    def avatar_url(self) -> str:
+        return gravatar_url(self.email)
