@@ -122,3 +122,23 @@ export function useRemoveAvatar() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
   });
 }
+
+export function useImportEmployees() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      const { data } = await api.post<{ added: number; message: string }>(
+        "/employees/import",
+        body,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}

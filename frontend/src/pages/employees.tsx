@@ -15,9 +15,11 @@ import {
 import {
   ArrowDown,
   ArrowUp,
+  Download,
   MoreHorizontal,
   Plus,
   Settings2,
+  Upload,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -28,6 +30,7 @@ import ColumnHeader, {
 import FacetedFilter from "@/components/data-table/faceted-filter";
 import RangeFilter from "@/components/data-table/range-filter";
 import DeleteEmployeeDialog from "@/components/delete-employee-dialog";
+import ImportDialog from "@/components/import-dialog";
 import EmployeeDialog from "@/components/employee-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +53,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useDepartments } from "@/lib/departments";
+import { exportEmployees } from "@/lib/csv";
 import { useEmployees } from "@/lib/employees";
 import { formatDate, formatSalary, initials } from "@/lib/format";
 import type { Employee } from "@/types";
@@ -96,6 +100,12 @@ export default function EmployeesPage() {
   const [editing, setEditing] = useState<Employee | undefined>(undefined);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState<Employee | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const emailsById = useMemo(
+    () => new Map(employees.map((employee) => [employee.id, employee.email])),
+    [employees],
+  );
 
   const managerNames = useMemo(() => {
     const names = new Map<number, string>();
@@ -268,15 +278,33 @@ export default function EmployeesPage() {
             shown
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEditing(undefined);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="size-4" />
-          Add employee
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Download className="size-4" />
+            Import
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              exportEmployees(
+                table.getFilteredRowModel().rows.map((row) => row.original),
+                emailsById,
+              )
+            }
+          >
+            <Upload className="size-4" />
+            Export
+          </Button>
+          <Button
+            onClick={() => {
+              setEditing(undefined);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="size-4" />
+            Add employee
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -459,6 +487,8 @@ export default function EmployeesPage() {
         employees={employees}
         departments={departments}
       />
+
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} />
 
       <DeleteEmployeeDialog
         key={deleting?.id}

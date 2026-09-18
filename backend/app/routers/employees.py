@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -12,6 +14,7 @@ from app.schemas.employee import (
     EmployeeOut,
 )
 from app.services import storage
+from app.services.csv_import import ImportError_, import_employees
 from app.services.hierarchy import bad_request, check_manager, reassign_and_delete
 
 router = APIRouter(
@@ -134,3 +137,17 @@ def remove_avatar(employee_id: int, db: DbSession) -> Employee:
     if previous:
         storage.delete(previous)
     return employee
+
+
+@router.post("/import")
+def import_csv(db: DbSession, file: Annotated[UploadFile, File()]) -> dict[str, int | str]:
+    try:
+        added = import_employees(db, file.file.read())
+    except ImportError_ as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "The file could not be imported.", "errors": error.errors},
+        ) from None
+
+    return {"added": added, "message": f"Imported {added} employees."}
