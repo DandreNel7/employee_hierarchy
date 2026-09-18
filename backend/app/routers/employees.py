@@ -4,7 +4,14 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.deps import DbSession, get_current_user
 from app.models import Department, Employee
-from app.schemas.employee import EmployeeIn, EmployeeOut
+from app.schemas.employee import (
+    AvatarSaveIn,
+    AvatarUploadIn,
+    AvatarUploadOut,
+    EmployeeIn,
+    EmployeeOut,
+)
+from app.services import storage
 from app.services.hierarchy import bad_request, check_manager, reassign_and_delete
 
 router = APIRouter(
@@ -82,3 +89,48 @@ def delete_employee(employee_id: int, db: DbSession, reassign_to: int | None = N
     """Direct reports move to reassign_to, or to the top of the chart if it is left out."""
     employee = get_employee(db, employee_id)
     reassign_and_delete(db, employee, reassign_to)
+
+
+@router.post("/{employee_id}/avatar", response_model=AvatarUploadOut)
+def start_avatar_upload(employee_id: int, data: AvatarUploadIn, db: DbSession) -> AvatarUploadOut:
+    employee = get_employee(db, employee_id)
+    if not storage.is_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Photo uploads are not set up on this environment.",
+        )
+    if data.content_type not in storage.ALLOWED_TYPES:
+        raise bad_request("Photos must be a JPEG, PNG or WebP image.")
+
+    key = storage.build_key(employee.id, data.content_type)
+    form = storage.upload_form(key, data.content_type)
+    return AvatarUploadOut(url=form["url"], fields=form["fields"], key=key)
+
+
+@router.put("/{employee_id}/avatar", response_model=EmployeeOut)
+def save_avatar(employee_id: int, data: AvatarSaveIn, db: DbSession) -> Employee:
+    employee = get_employee(db, employee_id)
+    if not data.key.startswith(f"avatars/{employee.id}/"):
+        raise bad_request("That photo does not belong to this employee.")
+
+    previous = employee.avatar_key
+    employee.avatar_key = data.key
+    db.commit()
+    db.refresh(employee)
+
+    if previous and previous != data.key:
+        storage.delete(previous)
+    return employee
+
+
+@router.delete("/{employee_id}/avatar", response_model=EmployeeOut)
+def remove_avatar(employee_id: int, db: DbSession) -> Employee:
+    employee = get_employee(db, employee_id)
+    previous = employee.avatar_key
+    employee.avatar_key = None
+    db.commit()
+    db.refresh(employee)
+
+    if previous:
+        storage.delete(previous)
+    return employee

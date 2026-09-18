@@ -9,7 +9,6 @@ MIN_AGE = 16
 
 
 class EmployeeIn(BaseModel):
-
     first_name: str = Field(min_length=1, max_length=100)
     last_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
@@ -48,5 +47,20 @@ class EmployeeOut(BaseModel):
     salary: Decimal
     role: str
     manager_id: int | None
+    avatar_key: str | None
     department: DepartmentOut | None
     avatar_url: str
+
+
+class AvatarUploadIn(BaseModel):
+    content_type: str
+
+
+class AvatarUploadOut(BaseModel):
+    url: str
+    fields: dict[str, str]
+    key: str
+
+
+class AvatarSaveIn(BaseModel):
+    key: str

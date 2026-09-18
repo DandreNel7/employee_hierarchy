@@ -82,3 +82,43 @@ export function descendantIds(employees: Employee[], employeeId: number) {
   }
   return ids;
 }
+
+interface UploadForm {
+  url: string;
+  fields: Record<string, string>;
+  key: string;
+}
+
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: number; file: File }) => {
+      const { data: form } = await api.post<UploadForm>(
+        `/employees/${id}/avatar`,
+        {
+          content_type: file.type,
+        },
+      );
+
+      const body = new FormData();
+      for (const [name, value] of Object.entries(form.fields)) {
+        body.append(name, value);
+      }
+      body.append("file", file);
+
+      const response = await fetch(form.url, { method: "POST", body });
+      if (!response.ok) throw new Error("The photo could not be uploaded.");
+
+      await api.put(`/employees/${id}/avatar`, { key: form.key });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
+  });
+}
+
+export function useRemoveAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/employees/${id}/avatar`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
+  });
+}

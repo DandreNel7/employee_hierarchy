@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,8 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { errorMessage } from "@/lib/api";
-import { groupDigits } from "@/lib/format";
-import { descendantIds, useSaveEmployee } from "@/lib/employees";
+import { groupDigits, initials } from "@/lib/format";
+import {
+  descendantIds,
+  useRemoveAvatar,
+  useSaveEmployee,
+  useUploadAvatar,
+} from "@/lib/employees";
 import type { Department, Employee } from "@/types";
 
 const NONE = "none";
@@ -86,6 +92,14 @@ export default function EmployeeDialog({
   departments,
 }: Props) {
   const save = useSaveEmployee();
+  const uploadPhoto = useUploadAvatar();
+  const removePhoto = useRemoveAvatar();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [pendingPhoto, setPendingPhoto] = useState<{
+    file: File;
+    url: string;
+  } | null>(null);
+  const [removePending, setRemovePending] = useState(false);
   const {
     register,
     handleSubmit,
@@ -102,6 +116,8 @@ export default function EmployeeDialog({
     if (open) {
       reset(toForm(employee));
       save.reset();
+      clearPendingPhoto();
+      setRemovePending(false);
     }
   }, [open, employee]);
 
@@ -112,6 +128,30 @@ export default function EmployeeDialog({
   const managerOptions = employees.filter(
     (e) => e.id !== employee?.id && !notAllowed.has(e.id),
   );
+
+  const current = employees.find((e) => e.id === employee?.id) ?? employee;
+
+  function clearPendingPhoto() {
+    if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
+    setPendingPhoto(null);
+  }
+
+  const photoPreview = pendingPhoto
+    ? pendingPhoto.url
+    : removePending
+      ? undefined
+      : current?.avatar_url;
+
+  async function applyPhotoChange(employeeId: number) {
+    if (pendingPhoto) {
+      await uploadPhoto.mutateAsync({
+        id: employeeId,
+        file: pendingPhoto.file,
+      });
+    } else if (removePending) {
+      await removePhoto.mutateAsync(employeeId);
+    }
+  }
 
   function onSubmit(values: EmployeeForm) {
     save.mutate(
@@ -126,7 +166,13 @@ export default function EmployeeDialog({
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: async (saved) => {
+          try {
+            await applyPhotoChange(saved.id);
+          } catch (error) {
+            toast.error(errorMessage(error, "The photo could not be saved."));
+            return;
+          }
           toast.success(employee ? "Employee updated" : "Employee added");
           onOpenChange(false);
         },
@@ -149,6 +195,78 @@ export default function EmployeeDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {current && (
+            <div className="flex items-center gap-4 rounded-md border p-3">
+              <Avatar className="size-14">
+                <AvatarImage src={photoPreview} alt="" />
+                <AvatarFallback>
+                  {initials(current.first_name, current.last_name)}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Photo</p>
+                <p className="text-xs text-muted-foreground">
+                  {pendingPhoto
+                    ? "New photo, saved when you press Save."
+                    : removePending
+                      ? "Photo removed, applied when you press Save."
+                      : current.avatar_key
+                        ? "Uploaded photo. Remove it to fall back to Gravatar."
+                        : "Showing their Gravatar. Upload a photo to override it."}
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    Choose photo
+                  </Button>
+                  {(pendingPhoto || removePending) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        clearPendingPhoto();
+                        setRemovePending(false);
+                      }}
+                    >
+                      Undo
+                    </Button>
+                  )}
+                  {current.avatar_key && !pendingPhoto && !removePending && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setRemovePending(true)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <input
+                ref={fileInput}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!file) return;
+                  setRemovePending(false);
+                  clearPendingPhoto();
+                  setPendingPhoto({ file, url: URL.createObjectURL(file) });
+                }}
+              />
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="first_name">Name</Label>

@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.services.avatars import gravatar_url
+from app.services.storage import view_url
 
 if TYPE_CHECKING:
     from app.models.department import Department
@@ -61,4 +62,9 @@ class Employee(Base):
 
     @property
     def avatar_url(self) -> str:
+        """An uploaded photo if there is one, otherwise their Gravatar."""
+        if self.avatar_key:
+            uploaded = view_url(self.avatar_key)
+            if uploaded:
+                return uploaded
         return gravatar_url(self.email)

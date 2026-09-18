@@ -19,6 +19,7 @@ export interface Employee {
   salary: string;
   role: string;
   manager_id: number | null;
+  avatar_key: string | null;
   department: Department | null;
   avatar_url: string;
 }

@@ -9,6 +9,9 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     aws_region: str = "eu-west-1"
     s3_bucket: str = ""
+    s3_endpoint_url: str = ""
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
 
 
 settings = Settings()
