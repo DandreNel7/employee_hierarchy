@@ -1,0 +1,43 @@
+server {
+    listen 80;
+    server_name _;
+
+    # CloudFront adds this header, so the instance cannot be reached directly.
+    if ($http_x_origin_secret != "${ORIGIN_SECRET}") {
+        return 403;
+    }
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Images come from Gravatar and from presigned S3 links.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://gravatar.com https://*.amazonaws.com; connect-src 'self' https://*.amazonaws.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    client_max_body_size 2m;
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+
+    location /api/ {
+        proxy_pass http://api:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+
+    # Vite puts a hash in these filenames, so they can be cached for a long time.
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Everything else is handled by the single page app.
+    location / {
+        try_files $uri /index.html;
+    }
+}
