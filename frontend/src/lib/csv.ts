@@ -2,7 +2,7 @@ import Papa from "papaparse";
 
 import type { Employee } from "@/types";
 
-function safeCell(value: string) {
+export function safeCell(value: string) {
   return /^[=+\-@]/.test(value) ? `'${value}` : value;
 }
 

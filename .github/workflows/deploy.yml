@@ -58,7 +58,7 @@ jobs:
             --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy ${{ github.sha }}" \
-            --parameters 'commands=["cd /opt/app && docker compose pull && docker compose up -d && docker image prune -f"]' \
+            --parameters 'commands=["aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}","cd /opt/app && docker compose pull && docker compose up -d && docker image prune -f"]' \
             --query "Command.CommandId" --output text)
 
           aws ssm wait command-executed \

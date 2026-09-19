@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: employee
+          POSTGRES_PASSWORD: employee
+          POSTGRES_DB: employee_hierarchy_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg://employee:employee@localhost:5432/employee_hierarchy_test
+      JWT_SECRET: testing-only-not-a-real-secret-long-enough-for-sha256
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check app tests
+
+      - name: Check formatting
+        run: uv run ruff format --check app tests
+
+      - name: Tests
+        run: uv run pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Types
+        run: npx tsc -b
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

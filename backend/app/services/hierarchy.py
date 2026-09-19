@@ -1,5 +1,5 @@
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.models import Employee
@@ -42,9 +42,9 @@ def check_manager(db: Session, manager_id: int | None, employee: Employee | None
 
 def reassign_and_delete(db: Session, employee: Employee, reassign_to: int | None) -> None:
     """Delete an employee, moving their direct reports somewhere sensible first."""
-    reports = list(employee.reports)
+    moves_to = None
 
-    if reports and reassign_to is not None:
+    if reassign_to is not None:
         new_manager = db.get(Employee, reassign_to)
         if new_manager is None:
             raise bad_request("The employee you picked to take over does not exist.")
@@ -53,21 +53,20 @@ def reassign_and_delete(db: Session, employee: Employee, reassign_to: int | None
 
         if new_manager.manager_id == employee.id:
             # Promoting one of the direct reports: they take their manager's place.
-            new_manager.manager_id = employee.manager_id
-            for report in reports:
-                if report.id != new_manager.id:
-                    report.manager_id = new_manager.id
+            db.execute(
+                update(Employee)
+                .where(Employee.id == new_manager.id)
+                .values(manager_id=employee.manager_id)
+            )
         elif new_manager.id in subtree_ids(db, employee.id):
             raise bad_request(
                 "Pick someone outside this person's team, or one of their direct reports."
             )
-        else:
-            for report in reports:
-                report.manager_id = new_manager.id
-    else:
-        # No one chosen, so the reports end up at the top of the chart.
-        for report in reports:
-            report.manager_id = None
+        moves_to = new_manager.id
+
+    db.execute(
+        update(Employee).where(Employee.manager_id == employee.id).values(manager_id=moves_to)
+    )
 
     db.delete(employee)
     db.commit()
