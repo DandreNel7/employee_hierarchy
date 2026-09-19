@@ -1,0 +1,144 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { api } from "@/lib/api";
+import type { Employee } from "@/types";
+
+export interface EmployeeInput {
+  first_name: string;
+  last_name: string;
+  email: string;
+  birth_date: string;
+  salary: string;
+  role: string;
+  department_id: number | null;
+  manager_id: number | null;
+}
+
+export function useEmployees() {
+  return useQuery({
+    queryKey: ["employees"],
+    queryFn: async () => {
+      const { data } = await api.get<Employee[]>("/employees");
+      return data;
+    },
+  });
+}
+
+export function useSaveEmployee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      values,
+    }: {
+      id?: number;
+      values: EmployeeInput;
+    }) => {
+      const { data } = id
+        ? await api.put<Employee>(`/employees/${id}`, values)
+        : await api.post<Employee>("/employees", values);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+export function useDeleteEmployee() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      reassignTo,
+    }: {
+      id: number;
+      reassignTo: number | null;
+    }) =>
+      api.delete(`/employees/${id}`, {
+        params: reassignTo === null ? {} : { reassign_to: reassignTo },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
+
+// Everyone below this employee.
+export function descendantIds(employees: Employee[], employeeId: number) {
+  const ids = new Set<number>();
+  const queue = [employeeId];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const employee of employees) {
+      if (employee.manager_id === current && !ids.has(employee.id)) {
+        ids.add(employee.id);
+        queue.push(employee.id);
+      }
+    }
+  }
+  return ids;
+}
+
+interface UploadForm {
+  url: string;
+  fields: Record<string, string>;
+  key: string;
+}
+
+export function useUploadAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: number; file: File }) => {
+      const { data: form } = await api.post<UploadForm>(
+        `/employees/${id}/avatar`,
+        {
+          content_type: file.type,
+        },
+      );
+
+      const body = new FormData();
+      for (const [name, value] of Object.entries(form.fields)) {
+        body.append(name, value);
+      }
+      body.append("file", file);
+
+      const response = await fetch(form.url, { method: "POST", body });
+      if (!response.ok) throw new Error("The photo could not be uploaded.");
+
+      await api.put(`/employees/${id}/avatar`, { key: form.key });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
+  });
+}
+
+export function useRemoveAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/employees/${id}/avatar`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
+  });
+}
+
+export function useImportEmployees() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      const { data } = await api.post<{ added: number; message: string }>(
+        "/employees/import",
+        body,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      queryClient.invalidateQueries({ queryKey: ["departments"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+    },
+  });
+}
