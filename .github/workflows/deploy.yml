@@ -11,7 +11,7 @@ permissions:
 
 env:
   AWS_REGION: eu-west-1
-  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
 
 jobs:
   deploy:
@@ -55,7 +55,7 @@ jobs:
       - name: Tell the instance to pull the new images
         run: |
           command_id=$(aws ssm send-command \
-            --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy ${{ github.sha }}" \
             --parameters 'commands=["cd /opt/app && docker compose pull && docker compose up -d && docker image prune -f"]' \
@@ -63,10 +63,10 @@ jobs:
 
           aws ssm wait command-executed \
             --command-id "$command_id" \
-            --instance-id "${{ vars.EC2_INSTANCE_ID }}" || true
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" || true
 
           aws ssm get-command-invocation \
             --command-id "$command_id" \
-            --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+            --instance-id "${{ secrets.EC2_INSTANCE_ID }}" \
             --query "{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}" \
             --output text
