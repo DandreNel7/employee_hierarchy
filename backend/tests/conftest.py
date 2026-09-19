@@ -30,6 +30,9 @@ def schema() -> None:
     command.upgrade(Config("alembic.ini"), "head")
 
 
+settings.cookie_secure = False
+
+
 @pytest.fixture(autouse=True)
 def without_rate_limiting() -> Iterator[None]:
     """Every test signs in from the same address, which would trip the login limit."""

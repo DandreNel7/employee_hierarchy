@@ -29,7 +29,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+psycopg://employee:employee@localhost:5432/employee_hierarchy_test
-      JWT_SECRET: testing-only-not-a-real-secret
+      JWT_SECRET: testing-only-not-a-real-secret-long-enough-for-sha256
 
     steps:
       - uses: actions/checkout@v4
